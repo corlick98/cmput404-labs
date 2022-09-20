@@ -2,6 +2,7 @@
 import socket
 import time
 import sys
+from multiprocessing import Process
 
 #define address & buffer size
 HOST = ""
@@ -57,41 +58,45 @@ def main():
         #continuously listen for connections
         while True:
             conn, addr = s.accept()
-            print("\nConnected by", addr)
+            p = Process(target=proxy_handler, args=(conn, addr))
+            p.daemon = True
+            p.start()
 
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as proxy_s:
-                try:
-                    #define address info, payload, and buffer size
-                    host = 'www.google.com'
-                    port = 80
-                    payload = f'GET / HTTP/1.0\r\nHost: {host}\r\n\r\n'
-                    buffer_size = 4096
-                    forward = create_tcp_socket()
-                    remote_ip = get_remote_ip(host)
+def proxy_handler(conn, addr):
+    print("\nConnected by", addr)
 
-                    forward.connect((remote_ip, port))
-                    print(f'Socket Connected to {host} on ip {remote_ip}')
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as proxy_s:
+        try:
+            #define address info, payload, and buffer size
+            fhost = 'www.google.com'
+            fport = 80
+            payload = f'GET / HTTP/1.0\r\nHost: {fhost}\r\n\r\n'
+            buffer_size = 4096
+            forward = create_tcp_socket()
+            remote_ip = get_remote_ip(fhost)
 
-                    send_data(forward, payload)
-                    forward.shutdown(socket.SHUT_WR)
+            forward.connect((remote_ip, fport))
+            print(f'Socket Connected to {fhost} on ip {remote_ip}')
 
-                    full_data = b""
-                    while True:
-                        data = forward.recv(buffer_size)
-                        if not data:
-                            break
-                        full_data += data
-                    # print(full_data)
-                    print("Collected data from forward connection")
-                    conn.sendall(full_data)
-                    print("Sent data to original client")
-                    time.sleep(5)
-                    conn.close()
+            send_data(forward, payload)
+            forward.shutdown(socket.SHUT_WR)
 
-                except Exception as e:
-                    print(e)
-                finally:
-                    proxy_s.close()
+            full_data = b""
+            while True:
+                data = forward.recv(buffer_size)
+                if not data:
+                    break
+                full_data += data
+            print(full_data)
+            print("Collected data from forward connection")
+            conn.sendall(full_data)
+            print("Sent data to original client")
+            conn.close()
+
+        except Exception as e:
+            print(e)
+        finally:
+            proxy_s.close()
 
 if __name__ == "__main__":
     main()

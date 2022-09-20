@@ -37,13 +37,15 @@ def send_data(serversocket, payload):
 def main():
     try:
         #define address info, payload, and buffer size
-        host = '127.0.0.1'
+        host = 'localhost'
         port = 8001
         payload = f'GET / HTTP/1.0\r\nHost: {host}\r\n\r\n'
-        buffer_size = 4096
+        buffer_size = 1024
 
         #make the socket, get the ip, and connect
         s = create_tcp_socket()
+        s.setblocking(False)
+        s.settimeout(3)
 
         remote_ip = get_remote_ip(host)
 
@@ -59,12 +61,13 @@ def main():
         #continue accepting data until no more left
         full_data = b""
         while True:
-            print("in loop")
-            data = s.recv(buffer_size)
-            print(bool(data))
-            if not data:
-                 break
-            full_data += data
+            try:
+                data = s.recv(buffer_size)
+                if not data:
+                    break
+                full_data += data
+            except socket.timeout:
+                break
         print(full_data)
     except Exception as e:
         print("Exception", e)
